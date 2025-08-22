@@ -824,6 +824,20 @@
                               <div class="unit-input"><input id="sohoi_duvao" type="number" value="2"><span>hồi</span></div>
                           </div>
                       </div>
+                      <div class="setting-item">
+                          <div class="setting-item-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path><path d="M13 7h-2v5.414l3.293 3.293 1.414-1.414L13 11.586z"></path></svg></div>
+                          <div class="input-wrapper">
+                              <label for="cauhinh_relay_on_ms">Thời gian reo (ms)</label>
+                              <div class="unit-input"><input id="cauhinh_relay_on_ms" type="number" value="1000"><span>ms</span></div>
+                          </div>
+                      </div>
+                      <div class="setting-item">
+                          <div class="setting-item-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"></path><path d="M12 12.586-8.707 9.293l-1.414 1.414L12 15.414l7.121-7.121-1.414-1.414z"></path></svg></div>
+                          <div class="input-wrapper">
+                              <label for="cauhinh_relay_off_ms">Thời gian nghỉ (ms)</label>
+                              <div class="unit-input"><input id="cauhinh_relay_off_ms" type="number" value="1000"><span>ms</span></div>
+                          </div>
+                      </div>
                   </div>
               </div>
           </details>
@@ -1477,8 +1491,76 @@
     // === END: FIXED CODE ===
 
     const containerSang=document.getElementById("tab-container-sang"),containerChieu=document.getElementById("tab-container-chieu"),days=[{id:"t2",name:"Thứ 2"},{id:"t3",name:"Thứ 3"},{id:"t4",name:"Thứ 4"},{id:"t5",name:"Thứ 5"},{id:"t6",name:"Thứ 6"},{id:"t7",name:"Thứ 7"},{id:"cn",name:"Chủ Nhật"}];days.forEach(e=>{containerSang.innerHTML+=createDayContent(`${e.id}_sang`,e.name,"sang"),containerChieu.innerHTML+=createDayContent(`${e.id}_chieu`,e.name,"chieu")});
-    function populateForm(e){const t=e.schedule?e.schedule:e;t&&t.sohoi&&t.lich?(console.log("Bat dau cap nhat form voi du lieu:",t),t.sohoi&&["batdau","vaotiet","rachoi","duvao"].forEach(e=>{const o=document.getElementById(`sohoi_${e}`);o&&(o.value=t.sohoi[e]||"")}),["sang","chieu"].forEach(e=>{days.forEach(o=>{const n=t.lich?.[e]?.[o.id];if(n){document.getElementById(`enable_${o.id}_${e}`).checked=n.enabled,document.getElementById(`gio_${o.id}_${e}`).value=n.gio||"",document.getElementById(`tiethoc_${o.id}_${e}`).value=n.tiethoc||"",document.getElementById(`rachoi_${o.id}_${e}`).value=n.rachoi||"",document.getElementById(`duvaotiet_${o.id}_${e}`).value=n.duvaotiet||"",document.getElementById(`sotiet_${o.id}_${e}`).value=n.sotiet||"";const t=document.getElementById(`chaoco_${o.id}_${e}`);t&&(t.value=n.chaoco||0);const a=document.getElementById(`chunhiem_${o.id}_${e}`);a&&(a.value=n.chunhiem||0),updatePreviewTable(`${o.id}_${e}`)}})})):console.error("Dữ liệu lịch học nhận được không hợp lệ hoặc không đầy đủ:",e)}
-    function gatherDataFromForm(){const e={sohoi:{},lich:{sang:{},chieu:{}}};return["batdau","vaotiet","rachoi","duvao"].forEach(t=>{e.sohoi[t]=parseInt(document.getElementById(`sohoi_${t}`).value)||0}),["sang","chieu"].forEach(t=>{days.forEach(o=>{const n=e.lich[t][o.id]={};n.enabled=document.getElementById(`enable_${o.id}_${t}`).checked,n.gio=document.getElementById(`gio_${o.id}_${t}`).value,n.tiethoc=parseInt(document.getElementById(`tiethoc_${o.id}_${t}`).value)||0,n.rachoi=parseInt(document.getElementById(`rachoi_${o.id}_${t}`).value)||0,n.duvaotiet=parseInt(document.getElementById(`duvaotiet_${o.id}_${t}`).value)||0,n.sotiet=parseInt(document.getElementById(`sotiet_${o.id}_${t}`).value)||0;const a=document.getElementById(`chaoco_${o.id}_${t}`);a&&(n.chaoco=parseInt(a.value)||0);const l=document.getElementById(`chunhiem_${o.id}_${t}`);l&&(n.chunhiem=parseInt(l.value)||0)})}),e}
+    
+    function populateForm(e){
+        const t=e.schedule?e.schedule:e;
+        if(t&&t.sohoi&&t.lich){
+            console.log("Bat dau cap nhat form voi du lieu:",t);
+            t.sohoi&&["batdau","vaotiet","rachoi","duvao"].forEach(e=>{
+                const o=document.getElementById(`sohoi_${e}`);
+                o&&(o.value=t.sohoi[e]||"")
+            });
+            ["sang","chieu"].forEach(e=>{
+                days.forEach(o=>{
+                    const n=t.lich?.[e]?.[o.id];
+                    if(n){
+                        document.getElementById(`enable_${o.id}_${e}`).checked=n.enabled;
+                        document.getElementById(`gio_${o.id}_${e}`).value=n.gio||"";
+                        document.getElementById(`tiethoc_${o.id}_${e}`).value=n.tiethoc||"";
+                        document.getElementById(`rachoi_${o.id}_${e}`).value=n.rachoi||"";
+                        document.getElementById(`duvaotiet_${o.id}_${e}`).value=n.duvaotiet||"";
+                        document.getElementById(`sotiet_${o.id}_${e}`).value=n.sotiet||"";
+                        const t=document.getElementById(`chaoco_${o.id}_${e}`);
+                        t&&(t.value=n.chaoco||0);
+                        const a=document.getElementById(`chunhiem_${o.id}_${e}`);
+                        a&&(a.value=n.chunhiem||0);
+                        updatePreviewTable(`${o.id}_${e}`)
+                    }
+                })
+            });
+            // *** BẮT ĐẦU THAY ĐỔI ***
+            if (t.cauhinh) {
+                const on_ms_input = document.getElementById('cauhinh_relay_on_ms');
+                if(on_ms_input) on_ms_input.value = t.cauhinh.relay_on_ms || 1000;
+
+                const off_ms_input = document.getElementById('cauhinh_relay_off_ms');
+                if(off_ms_input) off_ms_input.value = t.cauhinh.relay_off_ms || 1000;
+            }
+            // *** KẾT THÚC THAY ĐỔI ***
+        } else {
+            console.error("Dữ liệu lịch học nhận được không hợp lệ hoặc không đầy đủ:",e)
+        }
+    }
+
+    function gatherDataFromForm(){
+        const e={sohoi:{},lich:{sang:{},chieu:{}}};
+        ["batdau","vaotiet","rachoi","duvao"].forEach(t=>{
+            e.sohoi[t]=parseInt(document.getElementById(`sohoi_${t}`).value)||0
+        });
+        ["sang","chieu"].forEach(t=>{
+            days.forEach(o=>{
+                const n=e.lich[t][o.id]={};
+                n.enabled=document.getElementById(`enable_${o.id}_${t}`).checked;
+                n.gio=document.getElementById(`gio_${o.id}_${t}`).value;
+                n.tiethoc=parseInt(document.getElementById(`tiethoc_${o.id}_${t}`).value)||0;
+                n.rachoi=parseInt(document.getElementById(`rachoi_${o.id}_${t}`).value)||0;
+                n.duvaotiet=parseInt(document.getElementById(`duvaotiet_${o.id}_${t}`).value)||0;
+                n.sotiet=parseInt(document.getElementById(`sotiet_${o.id}_${t}`).value)||0;
+                const a=document.getElementById(`chaoco_${o.id}_${t}`);
+                a&&(n.chaoco=parseInt(a.value)||0);
+                const l=document.getElementById(`chunhiem_${o.id}_${t}`);
+                l&&(n.chunhiem=parseInt(l.value)||0)
+            })
+        });
+        // *** BẮT ĐẦU THAY ĐỔI ***
+        e.cauhinh = {
+            relay_on_ms: parseInt(document.getElementById('cauhinh_relay_on_ms').value) || 1000,
+            relay_off_ms: parseInt(document.getElementById('cauhinh_relay_off_ms').value) || 1000
+        };
+        // *** KẾT THÚC THAY ĐỔI ***
+        return e;
+    }
+
     function openDay(e,t,o){const n=e.currentTarget,a=document.getElementById(t);if(n.classList.contains("active"))return a.style.display="none",void n.classList.remove("active");let s;const i=document.getElementsByClassName("tabcontent");for(s=0;s<i.length;s++)i[s].style.display="none";const d=document.getElementsByClassName("tablinks-sang");for(s=0;s<d.length;s++)d[s].className=d[s].className.replace(" active","");const r=document.getElementsByClassName("tablinks-chieu");for(s=0;s<r.length;s++)r[s].className=r[s].className.replace(" active","");a.style.display="block",n.className+=" active"}
     function timeToMinute(e){if(!e)return 0;const[t,o]=e.split(":").map(Number);return 60*t+o}function minuteToTime(e){const t=Math.floor(e/60).toString().padStart(2,"0"),o=(e%60).toString().padStart(2,"0");return`${t}:${o}`}
     function calculateSchedule(e){const t=e=>parseInt(document.getElementById(e)?.value)||0,o=e=>timeToMinute(document.getElementById(e).value),n=o(`gio_${e}`),a=t(`tiethoc_${e}`),l=t(`rachoi_${e}`),c=t(`duvaotiet_${e}`),s=t(`sotiet_${e}`),i=t(`chaoco_${e}`),d=t(`chunhiem_${e}`);let r=[],u=n;if(i>0)r.push({time:u,description:"Dự vào"}),u+=c,r.push({time:u,description:"Chào cờ"}),u+=i,r.push({time:u,description:"Vào tiết 1"});else if(d>0)r.push({time:u,description:"Bắt đầu SH"}),c>0&&r.push({time:u+d,description:"Dự vào tiết 1"}),u=u+d+c,r.push({time:u,description:"Vào tiết 1"});else r.push({time:u,description:"Vào tiết 1"});for(let e=1;e<=s;e++){let t=u+a;e<s?(l>0&&r.push({time:t,description:`Ra chơi tiết ${e}`}),u=(t+=l)+c,c>0&&r.push({time:t,description:`Dự vào tiết ${e+1}`}),r.push({time:u,description:`Vào tiết ${e+1}`}))  :l>0&&r.push({time:t,description:"Ra về"})}const m=Array.from(new Map(r.map(e=>[e.time,e])).values());return m.map(e=>({...e,time:minuteToTime(e.time)})).sort((e,t)=>timeToMinute(e.time)-timeToMinute(t.time))}
