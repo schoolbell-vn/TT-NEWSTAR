@@ -942,6 +942,10 @@
                 <div id="ota-file-name" style="text-align: center; color: #f1c40f; font-weight: bold; min-height: 20px; font-size: 0.9em;">Chưa chọn tệp nào</div>
 
                 <div id="ota-progress-container">
+    <div id="ota-upload-speed"
+    ></div>
+    <div id="ota-upload-eta" style="text-align:center; font-size:0.85em; color:#00e6ff; margin-top:2px;">Thời gian còn lại: -- giây</div>
+    <div id="ota-upload-speed" style="text-align:center; font-size:0.85em; color:#f1c40f; margin-top:4px;">Tốc độ: -- KB/s</div>
                     <div id="ota-progress-bar">0%</div>
                 </div>
                 
@@ -1074,6 +1078,14 @@
                     const otaStatusText = document.getElementById('ota-status-text');
                     otaStatusText.textContent = `[${status.device}] ${status.details}`;
 
+            // Progress sẽ được cập nhật theo client gửi, nhưng nếu ESP32 báo về thì sẽ ghi đè để đảm bảo chính xác.
+if (status.progress !== undefined) {
+                const progressBar = document.getElementById('ota-progress-bar');
+                progressBar.style.width = status.progress + '%';
+                progressBar.textContent = status.progress + '%';
+            }
+
+
                     if (status.status === 'error') {
                         otaStatusText.style.color = '#e74c3c';
                         resetOtaUi(true);
@@ -1081,6 +1093,7 @@
                     } else if (status.status === 'success') {
                         otaStatusText.style.color = '#2ecc71';
                         showNotification("Cập nhật thành công! Thiết bị sẽ khởi động lại.", 'success');
+            resetOtaUi(true);
                     } else {
                         otaStatusText.style.color = '#bdc3c7';
                     }
@@ -1652,6 +1665,9 @@
             const fileSize = fileData.byteLength;
             const CHUNK_SIZE = 4096;
             let offset = 0;
+        let startTime = Date.now();
+        let lastOffset = 0;
+
 
             showNotification("Bắt đầu quá trình cập nhật OTA...", 'info');
             client.publish(OTA_COMMAND_TOPIC, `START:${fileSize}`, { qos: 1 });
@@ -1836,7 +1852,99 @@
     };
   }
 })();
-</script>
-<!-- END PATCH -->
-</body>
-</html>
+
+// ================== OTA UI & Upload Handling ==================
+
+// Lắng nghe sự kiện chọn file OTA
+document.getElementById('ota-file-input').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        document.getElementById('ota-file-name').textContent = file.name;
+        document.getElementById('ota-upload-btn').style.display = 'block';
+        window.selectedOtaFile = file;
+    } else {
+        document.getElementById('ota-file-name').textContent = "Chưa chọn tệp nào";
+        document.getElementById('ota-upload-btn').style.display = 'none';
+        window.selectedOtaFile = null;
+    }
+});
+
+// Hàm gửi file OTA qua MQTT
+function handleOtaUpload() {
+    if (!window.selectedOtaFile) {
+        showNotification("Chưa chọn file OTA!", "error");
+        return;
+    }
+    const file = window.selectedOtaFile;
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        const arrayBuffer = e.target.result;
+        const chunkSize = 1024; // 1KB
+        let offset = 0;
+        let startTime = Date.now();
+        let lastOffset = 0;
+
+
+        // Hiển thị thanh progress
+        const progressContainer = document.getElementById('ota-progress-container');
+        const progressBar = document.getElementById('ota-progress-bar');
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+
+        // Gửi lệnh START
+        client.publish(OTA_COMMAND_TOPIC, JSON.stringify({ 
+            action: "START", 
+            size: arrayBuffer.byteLength 
+        }), { qos: 1 });
+
+        function sendNext() {
+            if (offset < arrayBuffer.byteLength) {
+                const chunk = arrayBuffer.slice(offset, offset + chunkSize);
+                client.publish(OTA_DATA_TOPIC, new Uint8Array(chunk), { qos: 1 });
+
+                offset += chunkSize;
+                const percent = Math.min(100, Math.floor((offset / arrayBuffer.byteLength) * 100));
+                progressBar.style.width = percent + '%';
+                progressBar.textContent = percent + '%';
+
+                
+                // Tính tốc độ KB/s
+                const elapsed = (Date.now() - startTime) / 1000; // giây
+                const kbSent = offset / 1024;
+                if (elapsed > 0) {
+                    const speed = (kbSent / elapsed).toFixed(2);
+                    document.getElementById('ota-upload-speed').textContent = 'Tốc độ: ' + speed + ' KB/s';
+
+                // Tính toán ETA (giây còn lại)
+                const remainingBytes = arrayBuffer.byteLength - offset;
+                if (speed > 0) {
+                    // Tính toán ETA (mm:ss)
+                const remainingBytes = arrayBuffer.byteLength - offset;
+                if (speed > 0) {
+                    const etaSeconds = remainingBytes / 1024 / speed;
+                    const minutes = Math.floor(etaSeconds / 60);
+                    const seconds = Math.floor(etaSeconds % 60);
+                    const etaStr = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+                    document.getElementById('ota-upload-eta').textContent = 'Thời gian còn lại: ' + etaStr;
+                }
+                }
+
+                }
+
+                setTimeout(sendNext, 30); // tránh nghẽn
+            } else {
+                // Gửi lệnh END khi hoàn tất
+                client.publish(OTA_COMMAND_TOPIC, JSON.stringify({ action: "END" }), { qos: 1 });
+                showNotification("Đã gửi xong file OTA, chờ thiết bị xử lý...", "info");
+            }
+        }
+
+        sendNext();
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+  </script>
