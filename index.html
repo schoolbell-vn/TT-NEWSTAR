@@ -975,6 +975,10 @@
     if("true"!==sessionStorage.getItem("isLoggedIn"))window.location.href="login.html";
     
     let client, serverTime = null, targetDevice = null, targetAction = null;
+    let otaInProgress = false;
+    let otaStartTime = 0;
+    let otaLastUpdateTime = 0;
+    let otaLastReceivedSize = 0;
     
     const brokerUrl="wss://102a662407384e829f82d57c47a5f255.s1.eu.hivemq.cloud:8884/mqtt";
     const options={username:"ngoctuyka",password:"Tu12345678@",clientId:"WebAppClient_"+parseInt(1e3*Math.random()),reconnectPeriod:2e3,protocolVersion: 4};
@@ -1062,21 +1066,44 @@
                 }
             }
             
+            // *** CẬP NHẬT LOGIC CHO OTA_STATUS_TOPIC ***
             if (topic === OTA_STATUS_TOPIC) {
                 try {
                     const status = JSON.parse(payloadString);
                     const otaStatusText = document.getElementById('ota-status-text');
-                    otaStatusText.textContent = `[${status.device}] ${status.details}`;
-
-                    if (status.status === 'error') {
+                    const progressBar = document.getElementById('ota-progress-bar');
+                    
+                    if (status.status === 'progress') {
+                        const progress = status.progress || 0;
+                        progressBar.style.width = `${progress}%`;
+                        progressBar.textContent = `${progress}%`;
+                        
+                        const now = Date.now();
+                        const elapsed = (now - otaStartTime) / 1000;
+                        const currentSpeed = (status.current_size - otaLastReceivedSize) / ((now - otaLastUpdateTime) / 1000);
+                        
+                        const remainingBytes = status.total_size - status.current_size;
+                        const etaSeconds = (currentSpeed > 0) ? remainingBytes / currentSpeed : Infinity;
+                        const remainingTimeStr = formatTime(etaSeconds);
+                        const speedStr = formatBytesPerSecond(currentSpeed);
+                        
+                        otaStatusText.innerHTML = `Tốc độ: ${speedStr}/s | Còn lại: ${remainingTimeStr}`;
+                        
+                        otaLastUpdateTime = now;
+                        otaLastReceivedSize = status.current_size;
+                    } else if (status.status === 'error') {
                         otaStatusText.style.color = '#e74c3c';
+                        otaStatusText.textContent = `Lỗi OTA: ${status.details}`;
                         resetOtaUi(true);
                         showNotification(`Lỗi OTA: ${status.details}`, 'error');
                     } else if (status.status === 'success') {
                         otaStatusText.style.color = '#2ecc71';
+                        otaStatusText.textContent = `Cập nhật thành công! Đang khởi động lại...`;
+                        resetOtaUi(false);
                         showNotification("Cập nhật thành công! Thiết bị sẽ khởi động lại.", 'success');
                     } else {
                         otaStatusText.style.color = '#bdc3c7';
+                        otaStatusText.textContent = `[${status.device}] ${status.details}`;
                     }
                 } catch (e) {
                     console.error("Lỗi parse JSON trạng thái OTA:", e);
@@ -1392,7 +1419,7 @@
         });
     }
 
-    function _load(e){try{const t=JSON.parse(e);t.schedule&&t.epoch&&(setTime(t.epoch),populateForm(t))}catch(t){console.error("Lỗi parse JSON từ MQTT:",t)}}
+    function _load(e){try{const t=JSON.parse(e);t.schedule&&t.epoch?(setTime(t.epoch),populateForm(t)):t.schedule&&populateForm(t)}catch(t){console.error("Lỗi parse JSON từ MQTT:",t)}}
     
     function publishUpdate(){
         if(!client||!client.connected) return showNotification("Chưa kết nối máy chủ!", 'error');
@@ -1666,18 +1693,25 @@
 
     // *** CÁC HÀM MỚI CHO OTA ***
     function resetOtaUi(isError = false) {
+        otaInProgress = false;
         document.getElementById('ota-select-file-btn').disabled = false;
-        document.getElementById('ota-upload-btn').disabled = false;
-        document.getElementById('ota-upload-btn').style.display = 'block';
+        const uploadBtn = document.getElementById('ota-upload-btn');
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Bắt đầu Cập nhật';
+        uploadBtn.style.display = 'block';
 
         if (isError) {
             document.getElementById('ota-progress-container').style.display = 'none';
+        } else {
+            document.getElementById('ota-progress-bar').style.width = '100%';
+            document.getElementById('ota-progress-bar').textContent = '100%';
         }
     }
 
     function handleOtaUpload() {
         if (!client || !client.connected) return showNotification("Chưa kết nối máy chủ!", 'error');
-        
+        if (otaInProgress) return;
+
         const fileInput = document.getElementById('ota-file-input');
         const file = fileInput.files[0];
 
@@ -1701,17 +1735,24 @@
         statusText.style.color = '#bdc3c7';
         statusText.textContent = 'Đang đọc file...';
 
+        otaInProgress = true;
+        const fileSize = file.size;
+        const CHUNK_SIZE = 4096;
+        let offset = 0;
+        
+        showNotification("Bắt đầu quá trình cập nhật OTA...", 'info');
+        client.publish(OTA_COMMAND_TOPIC, `START:${fileSize}`, { qos: 1 });
+        otaStartTime = Date.now();
+        otaLastUpdateTime = otaStartTime;
+        otaLastReceivedSize = 0;
+
         const reader = new FileReader();
         reader.onload = function(e) {
             const fileData = e.target.result;
-            const fileSize = fileData.byteLength;
-            const CHUNK_SIZE = 4096;
-            let offset = 0;
-
-            showNotification("Bắt đầu quá trình cập nhật OTA...", 'info');
-            client.publish(OTA_COMMAND_TOPIC, `START:${fileSize}`, { qos: 1 });
-
+            
             function sendChunk() {
+                if (!otaInProgress) return;
+                
                 if (offset >= fileSize) {
                     client.publish(OTA_COMMAND_TOPIC, "END", { qos: 1 });
                     statusText.textContent = 'Hoàn tất gửi file, đang chờ thiết bị xác nhận...';
@@ -1719,7 +1760,6 @@
                 }
 
                 const chunk = fileData.slice(offset, offset + CHUNK_SIZE);
-                // MQTT.js v4+ cần Buffer để gửi binary
                 client.publish(OTA_DATA_TOPIC, mqtt.Buffer.from(chunk), { qos: 0 }); 
                 offset += chunk.byteLength;
                 
@@ -1727,6 +1767,15 @@
                 progressBar.style.width = `${progress}%`;
                 progressBar.textContent = `${progress}%`;
                 
+                const elapsed = (Date.now() - otaStartTime) / 1000;
+                const speed = offset / elapsed;
+                const remainingBytes = fileSize - offset;
+                const etaSeconds = (speed > 0) ? remainingBytes / speed : Infinity;
+                const remainingTimeStr = formatTime(etaSeconds);
+                const speedStr = formatBytesPerSecond(speed);
+                
+                statusText.innerHTML = `Tốc độ: ${speedStr}/s | Còn lại: ${remainingTimeStr}`;
+
                 setTimeout(sendChunk, 5); // delay nhỏ để không làm nghẽn mạng
             }
             
@@ -1740,6 +1789,23 @@
 
         reader.readAsArrayBuffer(file);
     }
+    
+    function formatTime(seconds) {
+        if (!isFinite(seconds) || seconds < 0) return "--:--";
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+
+    function formatBytesPerSecond(bytes) {
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const dm = 2;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm));
+    }
+
 
     window.onload = function() { 
         connectToMqtt();
