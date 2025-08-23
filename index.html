@@ -942,10 +942,6 @@
                 <div id="ota-file-name" style="text-align: center; color: #f1c40f; font-weight: bold; min-height: 20px; font-size: 0.9em;">Chưa chọn tệp nào</div>
 
                 <div id="ota-progress-container">
-    <div id="ota-upload-speed"
-    ></div>
-    <div id="ota-upload-eta" style="text-align:center; font-size:0.85em; color:#00e6ff; margin-top:2px;">Thời gian còn lại: -- giây</div>
-    <div id="ota-upload-speed" style="text-align:center; font-size:0.85em; color:#f1c40f; margin-top:4px;">Tốc độ: -- KB/s</div>
                     <div id="ota-progress-bar">0%</div>
                 </div>
                 
@@ -1078,14 +1074,6 @@
                     const otaStatusText = document.getElementById('ota-status-text');
                     otaStatusText.textContent = `[${status.device}] ${status.details}`;
 
-            // Progress sẽ được cập nhật theo client gửi, nhưng nếu ESP32 báo về thì sẽ ghi đè để đảm bảo chính xác.
-if (status.progress !== undefined) {
-                const progressBar = document.getElementById('ota-progress-bar');
-                progressBar.style.width = status.progress + '%';
-                progressBar.textContent = status.progress + '%';
-            }
-
-
                     if (status.status === 'error') {
                         otaStatusText.style.color = '#e74c3c';
                         resetOtaUi(true);
@@ -1093,7 +1081,6 @@ if (status.progress !== undefined) {
                     } else if (status.status === 'success') {
                         otaStatusText.style.color = '#2ecc71';
                         showNotification("Cập nhật thành công! Thiết bị sẽ khởi động lại.", 'success');
-            resetOtaUi(true);
                     } else {
                         otaStatusText.style.color = '#bdc3c7';
                     }
@@ -1665,9 +1652,6 @@ if (status.progress !== undefined) {
             const fileSize = fileData.byteLength;
             const CHUNK_SIZE = 4096;
             let offset = 0;
-        let startTime = Date.now();
-        let lastOffset = 0;
-
 
             showNotification("Bắt đầu quá trình cập nhật OTA...", 'info');
             client.publish(OTA_COMMAND_TOPIC, `START:${fileSize}`, { qos: 1 });
@@ -1728,223 +1712,5 @@ if (status.progress !== undefined) {
         });
     };
   </script>
-
-<!-- BEGIN PATCH: remove chào cờ + chủ nhiệm, unify morning with afternoon -->
-<script>
-(function() {
-  function zeroAndHideFlagAndHomeroom() {
-    try {
-      document.querySelectorAll('input[id^="chaoco_"], input[id^="chunhiem_"]').forEach(function(inp) {
-        try {
-          inp.value = 0;
-          inp.setAttribute('value', '0');
-          inp.disabled = true;
-          var settingItem = inp.closest('.setting-item');
-          if (settingItem) settingItem.style.display = 'none';
-          var label = document.querySelector('label[for="' + inp.id + '"]');
-          if (label) label.style.display = 'none';
-        } catch (err) { console.warn(err); }
-      });
-    } catch (e) { console.warn('zeroAndHideFlagAndHomeroom error', e); }
-  }
-
-  function copyAfternoonToMorningAll() {
-    var days = ['t2','t3','t4','t5','t6','t7'];
-    var fields = ['enable_', 'gio_', 'tiethoc_', 'rachoi_', 'duvaotiet_', 'sotiet_', 'tiethoc_', 'tiethoc_'];
-    days.forEach(function(d) {
-      var fromId = d + '_chieu';
-      var toId   = d + '_sang';
-      fields.forEach(function(prefix) {
-        var src = document.getElementById(prefix + fromId);
-        var dst = document.getElementById(prefix + toId);
-        if (src && dst) {
-          if (src.type === 'checkbox') dst.checked = src.checked;
-          else dst.value = src.value;
-        }
-      });
-      // also ensure chào cờ & chủ nhiệm are zeroed and hidden
-      ['chaoco_', 'chunhiem_'].forEach(function(prefix) {
-        var dst = document.getElementById(prefix + toId);
-        if (dst) { dst.value = 0; dst.setAttribute('value','0'); dst.disabled = true; }
-      });
-    });
-  }
-
-  function sanitizeScheduleData(data) {
-    try {
-      if (!data || !data.lich) return data;
-      var days = ['t2','t3','t4','t5','t6','t7'];
-      // unify: morning schedule = afternoon schedule
-      data.lich.sang = data.lich.sang || {};
-      data.lich.chieu = data.lich.chieu || {};
-      days.forEach(function(d) {
-        var afternoon = data.lich.chieu[d] || {};
-        // clone afternoon to morning
-        data.lich.sang[d] = JSON.parse(JSON.stringify(afternoon));
-        // remove/zero chào cờ + chủ nhiệm for both sessions
-        ['chaoco', 'chunhiem'].forEach(function(k) {
-          if (data.lich.sang[d])   data.lich.sang[d][k] = 0;
-          if (data.lich.chieu[d])  data.lich.chieu[d][k] = 0;
-        });
-      });
-    } catch (e) { console.warn('sanitizeScheduleData error', e); }
-    return data;
-  }
-
-  // Hook populateForm to apply UI changes after data arrives
-  var _populateForm = window.populateForm;
-  if (typeof _populateForm === 'function') {
-    window.populateForm = function(payload) {
-      try { _populateForm.call(this, payload); } catch (e) { console.warn(e); }
-      // After the UI is populated, apply our rules
-      copyAfternoonToMorningAll();
-      zeroAndHideFlagAndHomeroom();
-      try {
-        // Update previews if function exists
-        if (typeof window.updatePreviewTable === 'function') {
-          ['t2','t3','t4','t5','t6','t7'].forEach(function(d) {
-            ['sang','chieu'].forEach(function(sess) {
-              var id = d + '_' + sess;
-              if (document.getElementById('details-' + id)) {
-                window.updatePreviewTable(id);
-              }
-            });
-          });
-        }
-      } catch (e) { console.warn(e); }
-    };
-  } else {
-    document.addEventListener('DOMContentLoaded', function(){
-      zeroAndHideFlagAndHomeroom();
-      copyAfternoonToMorningAll();
-    });
-  }
-
-  // Hook gatherDataFromForm to enforce rules in outgoing payloads
-  var _gather = window.gatherDataFromForm;
-  if (typeof _gather === 'function') {
-    window.gatherDataFromForm = function() {
-      var data = {};
-      try { data = _gather.call(this) || {}; } catch (e) { console.warn(e); }
-      return sanitizeScheduleData(data);
-    };
-  }
-
-  // For safety: when previewing, ensure the two fields are 0 so they never appear
-  var _updatePreviewTable = window.updatePreviewTable;
-  if (typeof _updatePreviewTable === 'function') {
-    window.updatePreviewTable = function(id) {
-      // temporarily force values to zero before calculating
-      try {
-        var cc = document.getElementById('chaoco_' + id);
-        var cn = document.getElementById('chunhiem_' + id);
-        var prev = { cc: cc ? cc.value : null, cn: cn ? cn.value : null };
-        if (cc) cc.value = 0;
-        if (cn) cn.value = 0;
-        _updatePreviewTable.call(this, id);
-        // restore values (even though they are disabled/hidden)
-        if (cc && prev.cc !== null) cc.value = prev.cc;
-        if (cn && prev.cn !== null) cn.value = prev.cn;
-      } catch (e) {
-        // fallback if anything goes wrong
-        _updatePreviewTable.call(this, id);
-      }
-    };
-  }
-})();
-
-// ================== OTA UI & Upload Handling ==================
-
-// Lắng nghe sự kiện chọn file OTA
-document.getElementById('ota-file-input').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        document.getElementById('ota-file-name').textContent = file.name;
-        document.getElementById('ota-upload-btn').style.display = 'block';
-        window.selectedOtaFile = file;
-    } else {
-        document.getElementById('ota-file-name').textContent = "Chưa chọn tệp nào";
-        document.getElementById('ota-upload-btn').style.display = 'none';
-        window.selectedOtaFile = null;
-    }
-});
-
-// Hàm gửi file OTA qua MQTT
-function handleOtaUpload() {
-    if (!window.selectedOtaFile) {
-        showNotification("Chưa chọn file OTA!", "error");
-        return;
-    }
-    const file = window.selectedOtaFile;
-    const reader = new FileReader();
-
-    reader.onload = function(e) {
-        const arrayBuffer = e.target.result;
-        const chunkSize = 1024; // 1KB
-        let offset = 0;
-        let startTime = Date.now();
-        let lastOffset = 0;
-
-
-        // Hiển thị thanh progress
-        const progressContainer = document.getElementById('ota-progress-container');
-        const progressBar = document.getElementById('ota-progress-bar');
-        progressContainer.style.display = 'block';
-        progressBar.style.width = '0%';
-        progressBar.textContent = '0%';
-
-        // Gửi lệnh START
-        client.publish(OTA_COMMAND_TOPIC, JSON.stringify({ 
-            action: "START", 
-            size: arrayBuffer.byteLength 
-        }), { qos: 1 });
-
-        function sendNext() {
-            if (offset < arrayBuffer.byteLength) {
-                const chunk = arrayBuffer.slice(offset, offset + chunkSize);
-                client.publish(OTA_DATA_TOPIC, new Uint8Array(chunk), { qos: 1 });
-
-                offset += chunkSize;
-                const percent = Math.min(100, Math.floor((offset / arrayBuffer.byteLength) * 100));
-                progressBar.style.width = percent + '%';
-                progressBar.textContent = percent + '%';
-
-                
-                // Tính tốc độ KB/s
-                const elapsed = (Date.now() - startTime) / 1000; // giây
-                const kbSent = offset / 1024;
-                if (elapsed > 0) {
-                    const speed = (kbSent / elapsed).toFixed(2);
-                    document.getElementById('ota-upload-speed').textContent = 'Tốc độ: ' + speed + ' KB/s';
-
-                // Tính toán ETA (giây còn lại)
-                const remainingBytes = arrayBuffer.byteLength - offset;
-                if (speed > 0) {
-                    // Tính toán ETA (mm:ss)
-                const remainingBytes = arrayBuffer.byteLength - offset;
-                if (speed > 0) {
-                    const etaSeconds = remainingBytes / 1024 / speed;
-                    const minutes = Math.floor(etaSeconds / 60);
-                    const seconds = Math.floor(etaSeconds % 60);
-                    const etaStr = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
-                    document.getElementById('ota-upload-eta').textContent = 'Thời gian còn lại: ' + etaStr;
-                }
-                }
-
-                }
-
-                setTimeout(sendNext, 30); // tránh nghẽn
-            } else {
-                // Gửi lệnh END khi hoàn tất
-                client.publish(OTA_COMMAND_TOPIC, JSON.stringify({ action: "END" }), { qos: 1 });
-                showNotification("Đã gửi xong file OTA, chờ thiết bị xử lý...", "info");
-            }
-        }
-
-        sendNext();
-    };
-
-    reader.readAsArrayBuffer(file);
-}
-
-  </script>
+</body>
+</html>
