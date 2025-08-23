@@ -845,6 +845,7 @@
 
       <div class="divider-yellow"></div>
 
+      <!-- === KHU VỰC NÚT ĐIỀU KHIỂN (ĐÃ SẮP XẾP LẠI) === -->
       <div class="button-section">
         <button class="modern-btn save-button" onclick="publishUpdate()">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
@@ -867,6 +868,7 @@
     </div>
   </div>
 
+  <!-- === MODAL CÀI ĐẶT NÂNG CAO (ĐÃ CẬP NHẬT VỚI TAB OTA) === -->
   <div class="modal-overlay" id="advanced-settings-modal">
     <div class="modal-content">
         <h4>Cài đặt nâng cao</h4>
@@ -879,6 +881,7 @@
             <div class="adv-modal-tab" onclick="switchAdvTab(event, 'adv-tab-ota')">Cập nhật OTA</div>
         </div>
         
+        <!-- Tab 1: Quản lý Vệ tinh -->
         <div id="adv-tab-satellites" class="adv-modal-tab-content active">
             <h5>CÁC THIẾT BỊ ĐANG QUẢN LÝ</h5>
             <div id="managed-devices-list" class="device-list">
@@ -891,21 +894,28 @@
             </div>
         </div>
 
+        <!-- Tab 2: Hệ thống -->
         <div id="adv-tab-system" class="adv-modal-tab-content">
             <div id="system-info-actions-list" class="actions-list">
-                </div>
+                <!-- Nội dung được tạo bởi JavaScript -->
+            </div>
         </div>
 
+        <!-- Tab 3: Reset WiFi -->
         <div id="adv-tab-reset-wifi" class="adv-modal-tab-content">
             <div id="reset-wifi-actions-list" class="actions-list">
-                </div>
+                <!-- Nội dung sẽ được tạo bởi JavaScript -->
+            </div>
         </div>
 
+        <!-- Tab 4: Reset ESP -->
         <div id="adv-tab-reset-esp" class="adv-modal-tab-content">
             <div id="reset-esp-actions-list" class="actions-list">
-                </div>
+                <!-- Nội dung sẽ được tạo bởi JavaScript -->
+            </div>
         </div>
 
+        <!-- Tab 5: Đổi mật khẩu -->
         <div id="adv-tab-change-pass" class="adv-modal-tab-content">
             <h5>THAY ĐỔI MẬT KHẨU QUẢN TRỊ</h5>
             <div class="actions-list" style="gap: 15px; padding-top: 10px;">
@@ -916,6 +926,7 @@
             </div>
         </div>
         
+        <!-- Tab 6: Cập nhật OTA (MỚI) -->
         <div id="adv-tab-ota" class="adv-modal-tab-content">
             <h5>CẬP NHẬT FIRMWARE (OTA)</h5>
             <div class="actions-list" style="gap: 15px; padding-top: 10px;">
@@ -935,8 +946,11 @@
                 </div>
                 
                 <div id="ota-status-text"></div>
-
-                <button class="action-btn" id="ota-upload-btn" style="width: 100%; height: 40px; font-size: 0.9em; background-color: #27ae60; color: #fff; display: none;" onclick="handleOtaUpload()">Bắt đầu Cập nhật</button>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="action-btn" id="ota-upload-btn" style="flex: 1; height: 40px; font-size: 0.9em; background-color: #27ae60; color: #fff; display: none;" onclick="handleOtaUpload()">Bắt đầu Cập nhật</button>
+                    <button class="action-btn reset" id="ota-cancel-btn" style="flex: 1; height: 40px; font-size: 0.9em; display: none;" onclick="handleOtaCancel()">Hủy Cập nhật</button>
+                </div>
             </div>
         </div>
 
@@ -946,6 +960,7 @@
     </div>
   </div>
 
+  <!-- Modal Nhập Mật khẩu -->
   <div class="modal-overlay" id="password-modal-overlay">
       <div class="modal-content">
           <h4 id="password-modal-title">Xác thực quyền Quản trị</h4>
@@ -964,6 +979,7 @@
     
     let client, serverTime = null, targetDevice = null, targetAction = null;
     let otaInProgress = false;
+    let otaChunkInterval = null;
     
     const brokerUrl="wss://102a662407384e829f82d57c47a5f255.s1.eu.hivemq.cloud:8884/mqtt";
     const options={username:"ngoctuyka",password:"Tu12345678@",clientId:"WebAppClient_"+parseInt(1e3*Math.random()),reconnectPeriod:2e3,protocolVersion: 4};
@@ -1077,7 +1093,7 @@
                         showNotification(status.details, 'success');
                     } else {
                         otaStatusText.style.color = '#bdc3c7';
-                        otaStatusText.textContent = `[${status.device}] ${status.details}`;
+                        otaStatusText.textContent = `${status.details}`;
                     }
                 } catch (e) {
                     console.error("Lỗi parse JSON trạng thái OTA:", e);
@@ -1517,7 +1533,7 @@
     }
 
     function gatherDataFromForm() {
-        const data = { sohoi: {}, lich: { sang: {}, chieu: {} } };
+        const data = { sohoi: {}, lich: { sang: {}, chieu: {} }, cauhinh: {} };
         
         ["batdau", "vaotiet", "rachoi", "duvao"].forEach(key => {
             data.sohoi[key] = parseInt(document.getElementById(`sohoi_${key}`).value) || 0;
@@ -1670,17 +1686,30 @@
     // *** CÁC HÀM MỚI CHO OTA ***
     function resetOtaUi(isError = false) {
         otaInProgress = false;
+        clearInterval(otaChunkInterval);
         document.getElementById('ota-select-file-btn').disabled = false;
         const uploadBtn = document.getElementById('ota-upload-btn');
-        uploadBtn.disabled = false;
-        uploadBtn.textContent = 'Bắt đầu Cập nhật';
+        const cancelBtn = document.getElementById('ota-cancel-btn');
         uploadBtn.style.display = 'block';
+        cancelBtn.style.display = 'none';
 
         if (isError) {
             document.getElementById('ota-progress-container').style.display = 'none';
         } else {
             document.getElementById('ota-progress-bar').style.width = '100%';
             document.getElementById('ota-progress-bar').textContent = '100%';
+        }
+    }
+    
+    function handleOtaCancel() {
+        if (!otaInProgress) return;
+        if (confirm("Bạn có chắc chắn muốn hủy quá trình cập nhật OTA không?")) {
+            showNotification("Đã gửi lệnh hủy cập nhật OTA...", 'info');
+            client.publish(OTA_COMMAND_TOPIC, "CANCEL", { qos: 1 });
+            resetOtaUi(true); // Reset UI ngay lập tức
+            const statusText = document.getElementById('ota-status-text');
+            statusText.style.color = '#e74c3c';
+            statusText.textContent = "Đã hủy cập nhật OTA.";
         }
     }
 
@@ -1698,13 +1727,14 @@
 
         const selectBtn = document.getElementById('ota-select-file-btn');
         const uploadBtn = document.getElementById('ota-upload-btn');
+        const cancelBtn = document.getElementById('ota-cancel-btn');
         const progressContainer = document.getElementById('ota-progress-container');
         const progressBar = document.getElementById('ota-progress-bar');
         const statusText = document.getElementById('ota-status-text');
 
         selectBtn.disabled = true;
-        uploadBtn.disabled = true;
-        uploadBtn.textContent = 'Đang cập nhật...';
+        uploadBtn.style.display = 'none';
+        cancelBtn.style.display = 'block';
         progressContainer.style.display = 'block';
         progressBar.style.width = '0%';
         progressBar.textContent = '0%';
@@ -1723,26 +1753,24 @@
         reader.onload = function(e) {
             const fileData = e.target.result;
             
-            function sendChunk() {
-                if (!otaInProgress) return;
+            otaChunkInterval = setInterval(() => {
+                if (!otaInProgress) {
+                    clearInterval(otaChunkInterval);
+                    return;
+                }
                 
                 if (offset >= fileSize) {
+                    clearInterval(otaChunkInterval);
                     client.publish(OTA_COMMAND_TOPIC, "END", { qos: 1 });
                     statusText.textContent = 'Hoàn tất gửi file, đang chờ thiết bị xác nhận...';
                     return;
                 }
 
                 const chunk = fileData.slice(offset, offset + CHUNK_SIZE);
-                // Sửa lỗi: Cập nhật QoS từ 0 thành 1 để đảm bảo gói tin được gửi tới ESP32
                 client.publish(OTA_DATA_TOPIC, mqtt.Buffer.from(chunk), { qos: 1 }); 
                 offset += chunk.byteLength;
                 
-                // Loại bỏ logic cập nhật tiến trình cục bộ, giờ đây chỉ chờ thông báo từ ESP32
-                
-                setTimeout(sendChunk, 5); // delay nhỏ để không làm nghẽn mạng
-            }
-            
-            setTimeout(sendChunk, 1000); // Chờ 1s sau lệnh START
+            }, 5); 
         };
 
         reader.onerror = function() {
