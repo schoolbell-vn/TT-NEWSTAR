@@ -845,7 +845,6 @@
 
       <div class="divider-yellow"></div>
 
-      <!-- === KHU VỰC NÚT ĐIỀU KHIỂN (ĐÃ SẮP XẾP LẠI) === -->
       <div class="button-section">
         <button class="modern-btn save-button" onclick="publishUpdate()">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
@@ -868,7 +867,6 @@
     </div>
   </div>
 
-  <!-- === MODAL CÀI ĐẶT NÂNG CAO (ĐÃ CẬP NHẬT VỚI TAB OTA) === -->
   <div class="modal-overlay" id="advanced-settings-modal">
     <div class="modal-content">
         <h4>Cài đặt nâng cao</h4>
@@ -881,7 +879,6 @@
             <div class="adv-modal-tab" onclick="switchAdvTab(event, 'adv-tab-ota')">Cập nhật OTA</div>
         </div>
         
-        <!-- Tab 1: Quản lý Vệ tinh -->
         <div id="adv-tab-satellites" class="adv-modal-tab-content active">
             <h5>CÁC THIẾT BỊ ĐANG QUẢN LÝ</h5>
             <div id="managed-devices-list" class="device-list">
@@ -894,28 +891,21 @@
             </div>
         </div>
 
-        <!-- Tab 2: Hệ thống -->
         <div id="adv-tab-system" class="adv-modal-tab-content">
             <div id="system-info-actions-list" class="actions-list">
-                <!-- Nội dung được tạo bởi JavaScript -->
-            </div>
+                </div>
         </div>
 
-        <!-- Tab 3: Reset WiFi -->
         <div id="adv-tab-reset-wifi" class="adv-modal-tab-content">
             <div id="reset-wifi-actions-list" class="actions-list">
-                <!-- Nội dung sẽ được tạo bởi JavaScript -->
-            </div>
+                </div>
         </div>
 
-        <!-- Tab 4: Reset ESP -->
         <div id="adv-tab-reset-esp" class="adv-modal-tab-content">
             <div id="reset-esp-actions-list" class="actions-list">
-                <!-- Nội dung sẽ được tạo bởi JavaScript -->
-            </div>
+                </div>
         </div>
 
-        <!-- Tab 5: Đổi mật khẩu -->
         <div id="adv-tab-change-pass" class="adv-modal-tab-content">
             <h5>THAY ĐỔI MẬT KHẨU QUẢN TRỊ</h5>
             <div class="actions-list" style="gap: 15px; padding-top: 10px;">
@@ -926,7 +916,6 @@
             </div>
         </div>
         
-        <!-- Tab 6: Cập nhật OTA (MỚI) -->
         <div id="adv-tab-ota" class="adv-modal-tab-content">
             <h5>CẬP NHẬT FIRMWARE (OTA)</h5>
             <div class="actions-list" style="gap: 15px; padding-top: 10px;">
@@ -957,7 +946,6 @@
     </div>
   </div>
 
-  <!-- Modal Nhập Mật khẩu -->
   <div class="modal-overlay" id="password-modal-overlay">
       <div class="modal-content">
           <h4 id="password-modal-title">Xác thực quyền Quản trị</h4>
@@ -976,9 +964,6 @@
     
     let client, serverTime = null, targetDevice = null, targetAction = null;
     let otaInProgress = false;
-    let otaStartTime = 0;
-    let otaLastUpdateTime = 0;
-    let otaLastReceivedSize = 0;
     
     const brokerUrl="wss://102a662407384e829f82d57c47a5f255.s1.eu.hivemq.cloud:8884/mqtt";
     const options={username:"ngoctuyka",password:"Tu12345678@",clientId:"WebAppClient_"+parseInt(1e3*Math.random()),reconnectPeriod:2e3,protocolVersion: 4};
@@ -1066,7 +1051,7 @@
                 }
             }
             
-            // *** CẬP NHẬT LOGIC CHO OTA_STATUS_TOPIC ***
+            // Cập nhật giao diện OTA dựa trên trạng thái từ ESP32
             if (topic === OTA_STATUS_TOPIC) {
                 try {
                     const status = JSON.parse(payloadString);
@@ -1078,29 +1063,18 @@
                         progressBar.style.width = `${progress}%`;
                         progressBar.textContent = `${progress}%`;
                         
-                        const now = Date.now();
-                        const elapsed = (now - otaStartTime) / 1000;
-                        const currentSpeed = (status.current_size - otaLastReceivedSize) / ((now - otaLastUpdateTime) / 1000);
-                        
-                        const remainingBytes = status.total_size - status.current_size;
-                        const etaSeconds = (currentSpeed > 0) ? remainingBytes / currentSpeed : Infinity;
-                        const remainingTimeStr = formatTime(etaSeconds);
-                        const speedStr = formatBytesPerSecond(currentSpeed);
-                        
-                        otaStatusText.innerHTML = `Tốc độ: ${speedStr}/s | Còn lại: ${remainingTimeStr}`;
-                        
-                        otaLastUpdateTime = now;
-                        otaLastReceivedSize = status.current_size;
-                    } else if (status.status === 'error') {
+                        otaStatusText.textContent = `Đang cập nhật...`;
+
+                    } else if (status.status === 'error' || status.status === 'cancelled') {
                         otaStatusText.style.color = '#e74c3c';
-                        otaStatusText.textContent = `Lỗi OTA: ${status.details}`;
+                        otaStatusText.textContent = `${status.details}`;
                         resetOtaUi(true);
-                        showNotification(`Lỗi OTA: ${status.details}`, 'error');
+                        showNotification(status.details, 'error');
                     } else if (status.status === 'success') {
                         otaStatusText.style.color = '#2ecc71';
-                        otaStatusText.textContent = `Cập nhật thành công! Đang khởi động lại...`;
+                        otaStatusText.textContent = `${status.details}`;
                         resetOtaUi(false);
-                        showNotification("Cập nhật thành công! Thiết bị sẽ khởi động lại.", 'success');
+                        showNotification(status.details, 'success');
                     } else {
                         otaStatusText.style.color = '#bdc3c7';
                         otaStatusText.textContent = `[${status.device}] ${status.details}`;
@@ -1549,6 +1523,12 @@
             data.sohoi[key] = parseInt(document.getElementById(`sohoi_${key}`).value) || 0;
         });
 
+        // Bổ sung cấu hình reo/nghỉ chuông vào payload
+        data.cauhinh = {
+            relay_on_ms: parseInt(document.getElementById('cauhinh_relay_on_ms').value) || 1000,
+            relay_off_ms: parseInt(document.getElementById('cauhinh_relay_off_ms').value) || 1000
+        };
+
         ["sang", "chieu"].forEach(session => {
             days.forEach(day => {
                 const id_prefix = `${day.id}_${session}`;
@@ -1566,10 +1546,6 @@
             });
         });
         
-        data.cauhinh = {
-            relay_on_ms: parseInt(document.getElementById('cauhinh_relay_on_ms').value) || 1000,
-            relay_off_ms: parseInt(document.getElementById('cauhinh_relay_off_ms').value) || 1000
-        };
         return data;
     }
 
@@ -1742,9 +1718,6 @@
         
         showNotification("Bắt đầu quá trình cập nhật OTA...", 'info');
         client.publish(OTA_COMMAND_TOPIC, `START:${fileSize}`, { qos: 1 });
-        otaStartTime = Date.now();
-        otaLastUpdateTime = otaStartTime;
-        otaLastReceivedSize = 0;
 
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -1760,22 +1733,12 @@
                 }
 
                 const chunk = fileData.slice(offset, offset + CHUNK_SIZE);
-                client.publish(OTA_DATA_TOPIC, mqtt.Buffer.from(chunk), { qos: 0 }); 
+                // Sửa lỗi: Cập nhật QoS từ 0 thành 1 để đảm bảo gói tin được gửi tới ESP32
+                client.publish(OTA_DATA_TOPIC, mqtt.Buffer.from(chunk), { qos: 1 }); 
                 offset += chunk.byteLength;
                 
-                const progress = Math.min(100, Math.round((offset / fileSize) * 100));
-                progressBar.style.width = `${progress}%`;
-                progressBar.textContent = `${progress}%`;
+                // Loại bỏ logic cập nhật tiến trình cục bộ, giờ đây chỉ chờ thông báo từ ESP32
                 
-                const elapsed = (Date.now() - otaStartTime) / 1000;
-                const speed = offset / elapsed;
-                const remainingBytes = fileSize - offset;
-                const etaSeconds = (speed > 0) ? remainingBytes / speed : Infinity;
-                const remainingTimeStr = formatTime(etaSeconds);
-                const speedStr = formatBytesPerSecond(speed);
-                
-                statusText.innerHTML = `Tốc độ: ${speedStr}/s | Còn lại: ${remainingTimeStr}`;
-
                 setTimeout(sendChunk, 5); // delay nhỏ để không làm nghẽn mạng
             }
             
