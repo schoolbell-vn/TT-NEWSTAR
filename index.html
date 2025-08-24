@@ -1060,24 +1060,28 @@
             
             if (topic === OTA_STATUS_TOPIC) {
                 try {
-                    const status = JSON.parse(payloadString);
+                    const status = JSON.parse(payload.toString());
                     const otaStatusText = document.getElementById('ota-status-text');
-                    otaStatusText.textContent = `[${status.device}] ${status.details}`;
+                    const progressBar = document.getElementById('ota-progress-bar');
+                    const progressDetails = document.getElementById('ota-progress-details');
 
                     if (status.progress !== undefined) {
-                        const progressBar = document.getElementById('ota-progress-bar');
                         progressBar.style.width = status.progress + '%';
                         progressBar.textContent = status.progress + '%';
                     }
+                    otaStatusText.textContent = `[${status.device}]`;
+                    progressDetails.textContent = status.details;
+
 
                     if (status.status === 'error' || status.status === 'cancelled') {
                         otaStatusText.style.color = '#e74c3c';
-                        resetOtaUi(false); // Don't hide progress bar on error
+                        resetOtaUi(false);
                         showNotification(`Lỗi OTA: ${status.details}`, 'error');
                     } else if (status.status === 'success') {
                         otaStatusText.style.color = '#2ecc71';
+                        progressDetails.textContent = status.details;
                         showNotification("Cập nhật thành công! Thiết bị sẽ khởi động lại.", 'success');
-                        setTimeout(() => resetOtaUi(true), 2000); // Reset UI after a delay
+                        setTimeout(() => resetOtaUi(true), 2000);
                     } else {
                         otaStatusText.style.color = '#bdc3c7';
                     }
@@ -1141,7 +1145,7 @@
         const listDiv = document.getElementById('system-info-actions-list');
         if (!listDiv) return;
 
-        listDiv.innerHTML = ''; // Clear previous content
+        listDiv.innerHTML = ''; 
 
         const createItem = (icon, title, value, valueClass = '') => {
             return `
@@ -1551,7 +1555,7 @@
                 
                 currentTime = nextLessonStartTime + warningTime;
                 schedule.push({ time: currentTime, description: `Vào tiết ${i + 1}` });
-            } else { // Tiết cuối cùng
+            } else { 
                 if (breakTime > 0) {
                     schedule.push({ time: lessonEndTime, description: "Ra về" });
                 }
@@ -1591,14 +1595,13 @@
         showNotification('Sao chép thành công! Hãy nhấn "Lưu và gửi cập nhật" để áp dụng.', "success");
     }
 
-    // *** CÁC HÀM MỚI CHO OTA ***
     function resetOtaUi(hideProgress = false) {
         otaInProgress = false;
         const uploadBtn = document.getElementById('ota-upload-btn');
         document.getElementById('ota-select-file-btn').disabled = false;
         uploadBtn.disabled = false;
         uploadBtn.textContent = 'Bắt đầu Cập nhật';
-        uploadBtn.style.backgroundColor = '#27ae60'; // Green color
+        uploadBtn.style.backgroundColor = '#27ae60';
 
         if (hideProgress) {
             document.getElementById('ota-progress-container').style.display = 'none';
@@ -1631,7 +1634,7 @@
         selectBtn.disabled = true;
         uploadBtn.disabled = true;
         uploadBtn.textContent = 'Đang cập nhật...';
-        uploadBtn.style.backgroundColor = '#7f8c8d'; // Grey color
+        uploadBtn.style.backgroundColor = '#7f8c8d';
         progressContainer.style.display = 'flex';
         progressBar.style.width = '0%';
         progressBar.textContent = '0%';
@@ -1644,17 +1647,16 @@
         reader.onload = function(e) {
             const fileData = e.target.result;
             const fileSize = fileData.byteLength;
-            const CHUNK_SIZE = 2048; // Giảm chunk size để ổn định hơn
+            
+            const CHUNK_SIZE = 4096; 
             let offset = 0;
-            let startTime = Date.now();
-
+            
             showNotification("Bắt đầu quá trình cập nhật OTA...", 'info');
-            // Gửi lệnh START với cấu trúc JSON
             client.publish(OTA_COMMAND_TOPIC, JSON.stringify({ action: "START", size: fileSize }), { qos: 1 });
 
             function sendChunk() {
                 if (!otaInProgress || offset >= fileSize) {
-                    if (otaInProgress) { // Chỉ gửi END nếu không bị hủy
+                    if (otaInProgress) { 
                       client.publish(OTA_COMMAND_TOPIC, JSON.stringify({ action: "END" }), { qos: 1 });
                       statusText.textContent = 'Hoàn tất gửi file, đang chờ thiết bị xác nhận...';
                     }
@@ -1668,20 +1670,11 @@
                 const progress = Math.min(100, Math.round((offset / fileSize) * 100));
                 progressBar.style.width = `${progress}%`;
                 progressBar.textContent = `${progress}%`;
-
-                const elapsed = (Date.now() - startTime) / 1000;
-                const speed = (offset / 1024) / elapsed;
-                const remainingBytes = fileSize - offset;
-                const etaSeconds = remainingBytes / 1024 / speed;
-                const minutes = Math.floor(etaSeconds / 60);
-                const seconds = Math.floor(etaSeconds % 60);
-                const etaStr = isFinite(etaSeconds) ? `${minutes}:${seconds < 10 ? '0' : ''}${seconds}` : "--:--";
-                progressDetails.textContent = `Tốc độ: ${speed.toFixed(1)} KB/s | Còn lại: ${etaStr}`;
                 
-                setTimeout(sendChunk, 5); // delay nhỏ để không làm nghẽn mạng
+                setTimeout(sendChunk, 5);
             }
             
-            setTimeout(sendChunk, 1000); // Chờ 1s sau lệnh START
+            setTimeout(sendChunk, 1000);
         };
 
         reader.onerror = function() {
@@ -1703,7 +1696,6 @@
             }
         });
 
-        // Event listener cho input file OTA
         document.getElementById('ota-file-input').addEventListener('change', function(event) {
             const file = event.target.files[0];
             const uploadBtn = document.getElementById('ota-upload-btn');
