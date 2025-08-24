@@ -1065,13 +1065,23 @@
                     const progressBar = document.getElementById('ota-progress-bar');
                     const progressDetails = document.getElementById('ota-progress-details');
 
-                    if (status.progress !== undefined) {
-                        progressBar.style.width = status.progress + '%';
-                        progressBar.textContent = status.progress + '%';
+                    // Giai đoạn 2: Hiển thị tiến trình thực tế từ ESP32
+                    // Thanh progress bar sẽ chạy lại từ đầu theo % ESP32 gửi về
+                    if (status.status === 'start' || status.status === 'progress') {
+                        // Khi ESP bắt đầu nhận file, reset thanh progress của giao diện
+                        if (status.status === 'start') {
+                             progressBar.style.width = '0%';
+                             progressBar.textContent = '0%';
+                        }
+                        
+                        if (status.progress !== undefined) {
+                            progressBar.style.width = status.progress + '%';
+                            progressBar.textContent = status.progress + '%';
+                        }
                     }
+
                     otaStatusText.textContent = `[${status.device}]`;
                     progressDetails.textContent = status.details;
-
 
                     if (status.status === 'error' || status.status === 'cancelled') {
                         otaStatusText.style.color = '#e74c3c';
@@ -1080,6 +1090,7 @@
                     } else if (status.status === 'success') {
                         otaStatusText.style.color = '#2ecc71';
                         progressDetails.textContent = status.details;
+                        progressBar.style.width = '100%'; // Hoàn tất
                         showNotification("Cập nhật thành công! Thiết bị sẽ khởi động lại.", 'success');
                         setTimeout(() => resetOtaUi(true), 2000);
                     } else {
@@ -1658,20 +1669,24 @@
                 if (!otaInProgress || offset >= fileSize) {
                     if (otaInProgress) { 
                       client.publish(OTA_COMMAND_TOPIC, JSON.stringify({ action: "END" }), { qos: 1 });
-                      statusText.textContent = 'Hoàn tất gửi file, đang chờ thiết bị xác nhận...';
+                      statusText.textContent = `[ESP32-MayChu]`;
+                      progressDetails.textContent = 'Đã gửi 100%. Đang chờ ESP32 xử lý...';
+                      progressBar.style.width = '100%';
                     }
                     return;
                 }
 
                 const chunk = fileData.slice(offset, offset + CHUNK_SIZE);
-                client.publish(OTA_DATA_TOPIC, new Uint8Array(chunk), { qos: 0 }); 
+                // Gửi file với QoS = 1 để đảm bảo tin cậy
+                client.publish(OTA_DATA_TOPIC, new Uint8Array(chunk), { qos: 1 }); 
                 offset += chunk.byteLength;
                 
                 const progress = Math.min(100, Math.round((offset / fileSize) * 100));
                 progressBar.style.width = `${progress}%`;
                 progressBar.textContent = `${progress}%`;
                 
-                setTimeout(sendChunk, 5);
+                // Tăng delay để ESP32 có thời gian xử lý
+                setTimeout(sendChunk, 30);
             }
             
             setTimeout(sendChunk, 1000);
