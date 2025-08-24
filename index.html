@@ -1659,7 +1659,8 @@
             const fileData = e.target.result;
             const fileSize = fileData.byteLength;
             
-            const CHUNK_SIZE = 4096; 
+            // **THAY ĐỔI QUAN TRỌNG NHẤT: CHIA GÓI TIN CỰC NHỎ ĐỂ ĐẢM BẢO HOẠT ĐỘNG**
+            const CHUNK_SIZE = 256; 
             let offset = 0;
             
             showNotification("Bắt đầu quá trình cập nhật OTA...", 'info');
@@ -1685,10 +1686,11 @@
                 progressBar.style.width = `${progress}%`;
                 progressBar.textContent = `${progress}%`;
                 
-                // Tăng delay để ESP32 có thời gian xử lý
-                setTimeout(sendChunk, 30);
+                // Giảm delay vì gói tin nhỏ
+                setTimeout(sendChunk, 5);
             }
             
+            // Chờ một chút để lệnh START được xử lý
             setTimeout(sendChunk, 1000);
         };
 
